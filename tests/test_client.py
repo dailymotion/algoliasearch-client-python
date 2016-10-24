@@ -1,21 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
-
-from random import randint
-import time
 import os
+import time
+import unittest
+from random import randint
 
-try:
-    import unittest2 as unittest  # py26
-except ImportError:
-    import unittest
+from algoliasearch.client import MAX_API_KEY_LENGTH, Client
 
-from algoliasearch.client import Client, MAX_API_KEY_LENGTH
-
-from .helpers import safe_index_name
-from .helpers import get_api_client
-from .helpers import FakeData
+from .helpers import FakeData, get_api_client, safe_index_name
 
 
 class ClientTest(unittest.TestCase):
@@ -25,19 +17,20 @@ class ClientTest(unittest.TestCase):
     def setUpClass(cls):
         cls.client = get_api_client()
         cls.index_name = [
-            safe_index_name('àlgol?à1-python{0}'.format(randint(1, 1000))),
-            safe_index_name('àlgol?à2-python{0}'.format(randint(1, 1000))),
+            safe_index_name(u'àlgol?à1-python{0}'.format(randint(1, 100000))),
+            safe_index_name(u'àlgol?à2-python{0}'.format(randint(1, 100000))),
         ]
         cls.index = [cls.client.init_index(name) for name in cls.index_name]
-        for name in cls.index_name:
-            cls.client.delete_index(name)
-
         cls.factory = FakeData()
 
     @classmethod
     def tearDownClass(cls):
         for name in cls.index_name:
             cls.client.delete_index(name)
+
+    def setUp(self):
+        for name in self.index_name:
+            self.client.delete_index(name)
 
 
 class ClientNoDataOperationsTest(ClientTest):
@@ -135,14 +128,14 @@ class ClientNoDataOperationsTest(ClientTest):
         client.set_timeout(5, 2)
 
         now = time.time()
-        indices = client.list_indexes()
+        client.list_indexes()
         self.assertLess(now + 5, time.time())
 
 
 class ClientWithDataTest(ClientTest):
     """Tests that use two index with initial data."""
-
     def setUp(self):
+        super(ClientWithDataTest, self).setUp()
         self.objs = [
             self.factory.fake_contact(5),
             self.factory.fake_contact(5)
@@ -152,10 +145,6 @@ class ClientWithDataTest(ClientTest):
         for i, t in enumerate(task):
             self.index[i].wait_task(t['taskID'])
             self.objectsIDs.append(t['objectIDs'])
-
-    def tearDown(self):
-        for index in self.index:
-            index.clear_index()
 
     def test_list_indexes(self):
         res = self.client.list_indexes()

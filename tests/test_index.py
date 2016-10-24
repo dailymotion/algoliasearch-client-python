@@ -1,24 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
-
 import os
 import time
-from random import randint
-from decimal import Decimal
+import unittest
 from datetime import datetime
-
-try:
-    import unittest2 as unittest  # py26
-except ImportError:
-    import unittest
+from decimal import Decimal
+from random import randint
 
 from algoliasearch.client import MAX_API_KEY_LENGTH
 from algoliasearch.helpers import AlgoliaException
-
-from tests.helpers import safe_index_name
-from tests.helpers import get_api_client
-from tests.helpers import FakeData
+from tests.helpers import FakeData, get_api_client, safe_index_name
 
 
 class IndexTest(unittest.TestCase):
@@ -27,11 +18,8 @@ class IndexTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = get_api_client()
-        cls.index_name = safe_index_name('àlgol?à-python{0}'.format(
-                                         randint(1, 1000)))
+        cls.index_name = safe_index_name('àlgol?à-python{0}'.format(randint(1, 1000)))
         cls.index = cls.client.init_index(cls.index_name)
-        cls.client.delete_index(cls.index_name)
-
         cls.factory = FakeData()
 
     @classmethod
@@ -41,9 +29,6 @@ class IndexTest(unittest.TestCase):
 
 class IndexWithoutDataTest(IndexTest):
     """Tests that use one index without initial data."""
-
-    def tearDown(self):
-        self.index.clear_index()
 
     def test_add_object(self):
         obj = self.factory.fake_contact()
@@ -138,42 +123,38 @@ class IndexWithoutDataTest(IndexTest):
     def test_facet_search(self):
         settings = {'attributesForFacetting': ['searchable(series)', 'kind']}
         objects = [
-             {
-                 'objectID': '1',
-                 'name': 'Snoopy',
-                 'kind': [ 'dog', 'animal' ],
-                 'born': 1950,
-                 'series': 'Peanuts'
-             },
-             {
-                 'objectID': '2',
-                 'name': 'Woodstock',
-                 'kind': ['bird', 'animal' ],
-                 'born': 1960,
-                 'series': 'Peanuts'
-             },
-             {
-                 'objectID': '3',
-                 'name': 'Charlie Brown',
-                 'kind': [ 'human' ],
-                 'born': 1950,
-                 'series': 'Peanuts'
-             },
             {
+                'objectID': '1',
+                'name': 'Snoopy',
+                'kind': ['dog', 'animal'],
+                'born': 1950,
+                'series': 'Peanuts'
+            }, {
+                'objectID': '2',
+                'name': 'Woodstock',
+                'kind': ['bird', 'animal'],
+                'born': 1960,
+                'series': 'Peanuts'
+            }, {
+                'objectID': '3',
+                'name': 'Charlie Brown',
+                'kind': ['human'],
+                'born': 1950,
+                'series': 'Peanuts'
+            }, {
                 'objectID': '4',
                 'name': 'Hobbes',
-                'kind': ['tiger', 'animal', 'teddy' ],
+                'kind': ['tiger', 'animal', 'teddy'],
                 'born': 1985,
                 'series': 'Calvin & Hobbes'
-            },
-            {
+            }, {
                 'objectID': '5',
                 'name': 'Calvin',
-                'kind': [ 'human' ],
+                'kind': ['human'],
                 'born': 1985,
                 'series': 'Calvin & Hobbes'
-             }
-         ]
+            }
+        ]
 
         self.index.set_settings(settings)
         task = self.index.add_objects(objects)
@@ -190,6 +171,7 @@ class IndexWithoutDataTest(IndexTest):
         facetHits = self.index.search_facet('series', 'Peanutz', query)['facetHits']
         self.assertEqual(facetHits[0]['value'], 'Peanuts')
         self.assertEqual(facetHits[0]['count'], 1)
+
 
 class IndexWithReadOnlyDataTest(IndexTest):
     """Tests that use one index with initial data (read only)."""
@@ -375,13 +357,11 @@ class IndexWithModifiableDataTest(IndexTest):
     """Tests that use one index with initial data and modify it."""
 
     def setUp(self):
+        self.client.delete_index(self.index_name)
         self.objs = self.factory.fake_contact(5)
         task = self.index.add_objects(self.objs)
         self.index.wait_task(task['taskID'])
         self.objectIDs = task['objectIDs']
-
-    def tearDown(self):
-        self.index.clear_index()
 
     def test_delete_object(self):
         task = self.index.delete_object(self.objectIDs[2])
@@ -430,7 +410,7 @@ class IndexWithModifiableDataTest(IndexTest):
         self.assertEqual(res['nbHits'], 7)
 
         body_update = dict(self.objs[2])
-        body_update['name'] = 'Jòseph Diã'
+        body_update['name'] = u'Jòseph Diã'
         requests = [
             {
                 'action': 'updateObject',

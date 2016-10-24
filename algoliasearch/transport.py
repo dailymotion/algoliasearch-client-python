@@ -1,9 +1,9 @@
-import os
 import json
+import os
 
 from requests import Session
 
-from .helpers import urlify, CustomJSONEncoder, AlgoliaException
+from .helpers import AlgoliaException, CustomJSONEncoder, urlify
 
 try:
     from urllib import urlencode
@@ -82,9 +82,9 @@ class Transport():
         if res.status_code // 100 == 4:
             message = 'HTTP Code: %d' % (res.status_code)
             try:
-              j = res.json()
+                j = res.json()
             except:
-              j = { 'message': res.text}
+                j = {'message': res.text}
             if j is not None and 'message' in j:
                 message = j['message']
             raise AlgoliaException(message)

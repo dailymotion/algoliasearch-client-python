@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
-
 import os
 import time
 from random import randint
 
 from faker import Factory
-from algoliasearch.client import Client
+from algoliasearch import Client
 
 
 class FakeData(object):
@@ -39,10 +37,10 @@ class FakeData(object):
 
 def get_api_client():
     if 'APPENGINE_RUNTIME' in os.environ:
-        from google.appengine.api import apiproxy_stub_map 
+        from google.appengine.api import apiproxy_stub_map
         from google.appengine.api import urlfetch_stub
-        apiproxy_stub_map.apiproxy = apiproxy_stub_map.APIProxyStubMap() 
-        apiproxy_stub_map.apiproxy.RegisterStub('urlfetch',  urlfetch_stub.URLFetchServiceStub())
+        apiproxy_stub_map.apiproxy = apiproxy_stub_map.APIProxyStubMap()
+        apiproxy_stub_map.apiproxy.RegisterStub('urlfetch', urlfetch_stub.URLFetchServiceStub())
     return Client(os.environ['ALGOLIA_APPLICATION_ID'],
                   os.environ['ALGOLIA_API_KEY'])
 

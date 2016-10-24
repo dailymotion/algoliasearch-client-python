@@ -2,53 +2,24 @@
 
 import unittest
 import os
-import time
-import hashlib
-import hmac
-import sys
 
 from algoliasearch import algoliasearch
-
-
-def safe_index_name(name):
-    if 'TRAVIS' not in os.environ:
-        return name
-    job = os.environ['TRAVIS_JOB_NUMBER']
-    return '%s_travis-%s' % (name, job)
+from .helpers import safe_index_name, get_api_client
 
 
 class ClientTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.index_name = safe_index_name(u'àlgol?à-python')
+        cls.client = get_api_client()
+        cls.index = cls.client.init_index(cls.index_name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.delete_index(cls.index_name)
+
     def setUp(self):
-        try:
-            self.name = unichr(224) + 'lgol?' + unichr(224) + '-python'
-            self.name2 = unichr(224) + 'lgol?' + unichr(224) + '2-python'
-            self.name_obj = unichr(224) + '/go/?' + unichr(224) + '2-python'
-        except Exception:
-            self.name = 'àlgol?à-python'
-            self.name2 = 'àlgol?à2-python'
-            self.name_obj = 'à/go/?à2-python'
-
-        self.client = algoliasearch.Client(
-            os.environ['ALGOLIA_APPLICATION_ID'],
-            os.environ['ALGOLIA_API_KEY'])
-        index_name = safe_index_name(self.name)
-        try:
-            self.client.delete_index(index_name)
-        except algoliasearch.AlgoliaException:
-            pass
-        self.index = self.client.init_index(index_name)
-
-    def tearDown(self):
-        index_name = safe_index_name(self.name)
-        try:
-            self.client.delete_index(index_name)
-        except algoliasearch.AlgoliaException:
-            pass
-        index_name2 = safe_index_name(self.name2)
-        try:
-            self.client.delete_index(index_name2)
-        except algoliasearch.AlgoliaException:
-            pass
+        self.client.delete_index(self.index_name)
 
     def test_wrong_app_id(self):
         client = algoliasearch.Client("fakeappID", "blabla")
@@ -60,28 +31,43 @@ class ClientTest(unittest.TestCase):
 
     def test_retry(self):
         try:
-            client = algoliasearch.Client(os.environ['ALGOLIA_APPLICATION_ID'], os.environ['ALGOLIA_API_KEY'], ["fakeapp-1.algolianet.com", "fakeapp-2.algolianet.com", os.environ['ALGOLIA_APPLICATION_ID'] + ".algolianet.com"])
-            client.listIndexes
+            client = algoliasearch.Client(
+                os.environ['ALGOLIA_APPLICATION_ID'],
+                os.environ['ALGOLIA_API_KEY'], [
+                    "fakeapp-1.algolianet.com",
+                    "fakeapp-2.algolianet.com",
+                    os.environ['ALGOLIA_APPLICATION_ID'] + "-dsn.algolia.net"
+                ])
+            client.listIndexes()
         except algoliasearch.AlgoliaException as e:
+            print(e)
             self.assertTrue(False)
 
     def test_network(self):
         batch = []
         for i in range(1, 1000):
             batch.append({'action': 'addObject', 'body': {
-                'test1': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                'test2': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                'test3': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                'test1': 330 * 'a',
+                'test2': 330 * 'a',
+                'test3': 330 * 'a'
             }})
         self.index.batch(batch)
 
     def test_new_secured_keys(self):
-        self.assertEquals("MDZkNWNjNDY4M2MzMDA0NmUyNmNkZjY5OTMzYjVlNmVlMTk1NTEwMGNmNTVjZmJhMmIwOTIzYjdjMTk2NTFiMnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjk=", self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", "(public,user1)"))
-        self.assertEquals("MDZkNWNjNDY4M2MzMDA0NmUyNmNkZjY5OTMzYjVlNmVlMTk1NTEwMGNmNTVjZmJhMmIwOTIzYjdjMTk2NTFiMnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjk=", self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)"}))
-        self.assertTrue("ZDU0N2YzZjA3NGZkZGM2OTUxNzY3NzhkZDI3YWFkMjhhNzU5OTBiOGIyYTgyYzFmMjFjZTY4NTA0ODNiN2I1ZnVzZXJUb2tlbj00MiZ0YWdGaWx0ZXJzPSUyOHB1YmxpYyUyQ3VzZXIxJTI5" == self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)", 'userToken': '42'})
-            or "OGYwN2NlNTdlOGM2ZmM4MjA5NGM0ZmYwNTk3MDBkNzMzZjQ0MDI3MWZjNTNjM2Y3YTAzMWM4NTBkMzRiNTM5YnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjkmdXNlclRva2VuPTQy" == self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)", 'userToken': '42'}))
-        self.assertTrue("ZDU0N2YzZjA3NGZkZGM2OTUxNzY3NzhkZDI3YWFkMjhhNzU5OTBiOGIyYTgyYzFmMjFjZTY4NTA0ODNiN2I1ZnVzZXJUb2tlbj00MiZ0YWdGaWx0ZXJzPSUyOHB1YmxpYyUyQ3VzZXIxJTI5" == self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)"}, '42')
-            or "OGYwN2NlNTdlOGM2ZmM4MjA5NGM0ZmYwNTk3MDBkNzMzZjQ0MDI3MWZjNTNjM2Y3YTAzMWM4NTBkMzRiNTM5YnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjkmdXNlclRva2VuPTQy", self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)"}, '42'))
+        key1 = "MDZkNWNjNDY4M2MzMDA0NmUyNmNkZjY5OTMzYjVlNmVlMTk1NTEwMGNmNTVjZmJhMmIwOTIzYjdjMTk2NTFiMnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjk="
+        gen1_1 = self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", "(public,user1)")
+        self.assertEquals(key1, gen1_1)
+
+        gen1_2 = self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)"})
+        self.assertEquals(key1, gen1_2)
+
+        key2_1 = "ZDU0N2YzZjA3NGZkZGM2OTUxNzY3NzhkZDI3YWFkMjhhNzU5OTBiOGIyYTgyYzFmMjFjZTY4NTA0ODNiN2I1ZnVzZXJUb2tlbj00MiZ0YWdGaWx0ZXJzPSUyOHB1YmxpYyUyQ3VzZXIxJTI5"
+        key2_2 = "OGYwN2NlNTdlOGM2ZmM4MjA5NGM0ZmYwNTk3MDBkNzMzZjQ0MDI3MWZjNTNjM2Y3YTAzMWM4NTBkMzRiNTM5YnRhZ0ZpbHRlcnM9JTI4cHVibGljJTJDdXNlcjElMjkmdXNlclRva2VuPTQy"
+        gen2_1 = self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)", 'userToken': '42'})
+        self.assertTrue(key2_1 == gen2_1 or key2_2 == gen2_1)
+
+        gen2_2 = self.client.generate_secured_api_key("182634d8894831d5dbce3b3185c50881", {'tagFilters': "(public,user1)"}, '42')
+        self.assertTrue(key2_1 == gen2_2 or key2_2 == gen2_2)
 
     def test_disjunctive_faceting(self):
         self.index.set_settings(
